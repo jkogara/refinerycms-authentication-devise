@@ -1,17 +1,18 @@
+# frozen_string_literal: true
+
 module Refinery
   module Authentication
     module Devise
       module Admin
         class UsersController < Refinery::AdminController
-
           crudify :'refinery/authentication/devise/user',
-                  :order => 'username ASC',
-                  :title_attribute => 'username'
+                  order: 'username ASC',
+                  title_attribute: 'username'
 
           before_action :find_available_plugins, :find_available_roles,
-                        :only => [:new, :create, :edit, :update]
-          before_action :redirect_unless_user_editable!, :only => [:edit, :update]
-          before_action :exclude_password_assignment_when_blank!, :only => :update
+                        only: %i[new create edit update]
+          before_action :redirect_unless_user_editable!, only: %i[edit update]
+          before_action :exclude_password_assignment_when_blank!, only: :update
 
           def new
             @user = Refinery::Authentication::Devise::User.new
@@ -41,14 +42,14 @@ module Refinery
             @selected_plugin_names = params[:user][:plugins]
 
             if user_is_locking_themselves_out?
-              flash.now[:error] = t('lockout_prevented', :scope => 'refinery.authentication.devise.admin.users.update')
-              render :edit and return
+              flash.now[:error] = t('lockout_prevented', scope: 'refinery.authentication.devise.admin.users.update')
+              render(:edit) && return
             end
 
             store_user_memento
 
             @user.roles = @selected_role_names.map { |r| Refinery::Authentication::Devise::Role[r.downcase] }
-            if @user.update_attributes user_params.to_h
+            if @user.update(user_params.to_h)
               update_successful
             else
               update_failed
@@ -69,7 +70,7 @@ module Refinery
             end
 
             redirect_to refinery.authentication_devise_admin_users_path,
-                        :notice => t('created', :what => @user.username, :scope => 'refinery.crudify')
+                        notice: t('created', what: @user.username, scope: 'refinery.crudify')
           end
 
           def create_failed
@@ -78,7 +79,7 @@ module Refinery
 
           def update_successful
             redirect_to refinery.authentication_devise_admin_users_path,
-                        :notice => t('updated', :what => @user.username, :scope => 'refinery.crudify')
+                        notice: t('updated', what: @user.username, scope: 'refinery.crudify')
           end
 
           def update_failed
@@ -88,9 +89,9 @@ module Refinery
           end
 
           def find_available_plugins
-            @available_plugins = Refinery::Plugins.registered.in_menu.map { |a|
-              { :name => a.name, :title => a.title }
-            }.sort_by { |a| a[:title] }
+            @available_plugins = Refinery::Plugins.registered.in_menu.map do |a|
+              { name: a.name, title: a.title }
+            end.sort_by { |a| a[:title] }
           end
 
           def find_available_roles
@@ -98,12 +99,11 @@ module Refinery
           end
 
           def redirect_unless_user_editable!
-            unless current_refinery_user.can_edit? find_user
-              redirect_to refinery.authentication_devise_admin_users_path
-            end
+            redirect_to refinery.authentication_devise_admin_users_path unless current_refinery_user.can_edit? find_user
           end
 
           private
+
           def exclude_password_assignment_when_blank!
             if params[:user][:password].blank? && params[:user][:password_confirmation].blank?
               params[:user].extract!(:password, :password_confirmation)

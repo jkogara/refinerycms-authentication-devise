@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'devise'
 require 'friendly_id'
 
@@ -5,20 +7,19 @@ module Refinery
   module Authentication
     module Devise
       class User < Refinery::Core::BaseModel
-
         extend FriendlyId
 
         has_many :roles_users, class_name: 'Refinery::Authentication::Devise::RolesUsers'
         has_many :roles, through: :roles_users, class_name: 'Refinery::Authentication::Devise::Role'
 
         has_many :plugins, -> { order('position ASC') },
-                           class_name: "Refinery::Authentication::Devise::UserPlugin", dependent: :destroy
+                 class_name: 'Refinery::Authentication::Devise::UserPlugin', dependent: :destroy
 
         friendly_id :username, use: [:slugged]
 
         # Include default devise modules. Others available are:
         # :token_authenticatable, :confirmable, :lockable and :timeoutable
-        if self.respond_to?(:devise)
+        if respond_to?(:devise)
           devise :database_authenticatable, :registerable, :recoverable, :rememberable,
                  :trackable, :validatable, authentication_keys: [:login]
         end
@@ -36,12 +37,12 @@ module Refinery
           # https://github.com/plataformatec/devise/wiki/How-To:-Allow-users-to-sign_in-using-their-username-or-email-address
           def find_for_database_authentication(conditions)
             value = conditions[authentication_keys.first]
-            where(["username = :value OR email = :value", { value: value }]).first
+            where(['username = :value OR email = :value', { value: value }]).first
           end
 
           def find_or_initialize_with_error_by_reset_password_token(original_token)
             find_or_initialize_with_error_by :reset_password_token,
-              ::Devise.token_generator.digest(self, :reset_password_token, original_token)
+                                             ::Devise.token_generator.digest(self, :reset_password_token, original_token)
           end
         end
 
@@ -49,9 +50,9 @@ module Refinery
         # https://github.com/plataformatec/devise/blob/v3.2.4/lib/devise/models/recoverable.rb#L45-L56
         def generate_reset_password_token!
           raw, enc = ::Devise.token_generator.generate(self.class, :reset_password_token)
-          update_attributes(
-            :reset_password_token => enc,
-            :reset_password_sent_at => Time.now.utc
+          update(
+            reset_password_token: enc,
+            reset_password_sent_at: Time.now.utc
           )
           raw
         end
@@ -78,7 +79,7 @@ module Refinery
         def authorised_plugins
           plugins.collect(&:name) | ::Refinery::Plugins.always_allowed.names
         end
-        alias_method :authorized_plugins, :authorised_plugins
+        alias authorized_plugins authorised_plugins
 
         # Returns a URL to the first plugin with a URL in the menu. Used for
         # admin user's root admin url.
@@ -95,17 +96,19 @@ module Refinery
         end
 
         def can_edit?(user_to_edit = self)
-          user_to_edit.persisted? && (user_to_edit == self || self.has_role?(:superuser))
+          user_to_edit.persisted? && (user_to_edit == self || has_role?(:superuser))
         end
 
         def add_role(title)
-          raise ::ArgumentError, "Role should be the title of the role not a role object." if title.is_a?(::Refinery::Authentication::Devise::Role)
+          raise ::ArgumentError, 'Role should be the title of the role not a role object.' if title.is_a?(::Refinery::Authentication::Devise::Role)
+
           roles << ::Refinery::Authentication::Devise::Role[title] unless has_role?(title)
         end
 
         def has_role?(title)
-          raise ::ArgumentError, "Role should be the title of the role not a role object." if title.is_a?(::Refinery::Authentication::Devise::Role)
-          roles.any?{ |r| r.title == title.to_s.camelize}
+          raise ::ArgumentError, 'Role should be the title of the role not a role object.' if title.is_a?(::Refinery::Authentication::Devise::Role)
+
+          roles.any? { |r| r.title == title.to_s.camelize }
         end
 
         def create_first
@@ -129,29 +132,30 @@ module Refinery
         end
 
         private
+
         # To ensure uniqueness without case sensitivity we first downcase the username.
         # We do this here and not in SQL is that it will otherwise bypass indexes using LOWER:
         # SELECT 1 FROM "refinery_users" WHERE LOWER("refinery_users"."username") = LOWER('UsErNAME') LIMIT 1
         def downcase_username
-          self.username = self.username.downcase if self.username?
+          self.username = username.downcase if username?
         end
 
         # To ensure that we aren't creating "admin" and "admin " as the same thing.
         # Also ensures that "admin user" and "admin    user" are the same thing.
         def strip_username
-          self.username = self.username.strip.gsub(/\ {2,}/, ' ') if self.username?
+          self.username = username.strip.gsub(/\ {2,}/, ' ') if username?
         end
 
         def string_plugin_names(plugin_names)
-          plugin_names.select{ |plugin_name| plugin_name.is_a?(String) }
+          plugin_names.select { |plugin_name| plugin_name.is_a?(String) }
         end
 
         def create_plugins_for(plugin_names)
-          plugin_names.each { |plugin_name| plugins.create name: plugin_name, position: plugin_position}
+          plugin_names.each { |plugin_name| plugins.create name: plugin_name, position: plugin_position }
         end
 
         def plugin_position
-          plugins.select(:position).map{ |p| p.position.to_i}.max.to_i + 1
+          plugins.select(:position).map { |p| p.position.to_i }.max.to_i + 1
         end
 
         def filter_existing_plugins_for(plugin_names)
